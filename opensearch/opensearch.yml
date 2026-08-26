@@ -1,0 +1,68 @@
+# Static half of the OpenSearch node configuration.
+#
+# The entrypoint copies this file to config/opensearch.yml on every boot and
+# appends the settings that depend on the environment (the snapshot repository
+# client). Editing config/opensearch.yml inside a running container therefore
+# has no effect past the next deploy -- change this file instead.
+
+cluster.name: opensearch-railway
+node.name: opensearch-node
+
+# Railway routes only IPv6 between services in a project. The JDK never sets
+# IPV6_V6ONLY, so a "::" bind answers both an IPv6 peer and an IPv4 caller.
+# The publish address is pinned to loopback: the node is its own only
+# transport peer and its container address changes on every deploy.
+network.bind_host: "::"
+network.publish_host: "127.0.0.1"
+http.port: 9200
+
+# One node. Railway volumes are 1:1 with a service, and transport TLS between
+# nodes would need a CA private key shared by every node -- something no Railway
+# variable and no shared filesystem can carry.
+discovery.type: single-node
+
+# The default mmapfs store wants vm.max_map_count raised on the *host*, which a
+# container cannot do. niofs costs a little search throughput and nothing else.
+node.store.allow_mmap: false
+
+path.data: /usr/share/opensearch/data
+path.logs: /usr/share/opensearch/logs
+
+# ---------------------------------------------------------------------------
+# Security plugin
+# ---------------------------------------------------------------------------
+
+# Transport TLS is mandatory. These certificates are minted on the volume the
+# first time the node boots and are unique to this deployment -- the demo
+# certificates the upstream image can install are published by the project and
+# are the same everywhere, so they are never installed here.
+plugins.security.ssl.transport.pemcert_filepath: certs/node.pem
+plugins.security.ssl.transport.pemkey_filepath: certs/node-key.pem
+plugins.security.ssl.transport.pemtrustedcas_filepath: certs/ca.pem
+
+# The node's only transport peer is itself, and its address changes on every
+# deploy, so the certificate is pinned by DN below rather than by hostname.
+plugins.security.ssl.transport.enforce_hostname_verification: false
+
+# REST TLS stays off. The REST port is published to nobody: it is reachable
+# only over the project's private network, and Railway terminates TLS at the
+# edge for the Dashboards domain that users actually visit. Turning it on would
+# require handing this node's CA certificate to the Dashboards service, which
+# has no filesystem in common with this one. Authentication is unaffected --
+# every request still needs credentials.
+plugins.security.ssl.http.enabled: false
+
+plugins.security.nodes_dn:
+  - "CN=opensearch-node,OU=opensearch-railway,O=OpenSearch,C=US"
+plugins.security.authcz.admin_dn:
+  - "CN=admin,OU=opensearch-railway,O=OpenSearch,C=US"
+
+# Load config/opensearch-security/*.yml into the security index the first time
+# the cluster starts. internal_users.yml is rewritten by the entrypoint from
+# this deployment's own passwords, so no shipped credential reaches the index.
+plugins.security.allow_default_init_securityindex: true
+
+# Let the admin account manage users and roles from the Dashboards UI.
+plugins.security.restapi.roles_enabled: ["all_access"]
+
+plugins.security.audit.type: internal_opensearch
