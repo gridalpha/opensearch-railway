@@ -128,7 +128,6 @@ rm -rf "$CONF/certs"
 mkdir -p "$CONF/certs"
 cp "$CERT_STORE/ca.pem" "$CERT_STORE/node.pem" "$CERT_STORE/node-key.pem" \
    "$CERT_STORE/admin.pem" "$CERT_STORE/admin-key.pem" "$CONF/certs/"
-chmod 0600 "$CONF/certs/node-key.pem" "$CONF/certs/admin-key.pem"
 
 # ---------------------------------------------------------------------------
 # 4. Internal users
@@ -189,7 +188,6 @@ kibanaserver:
   reserved: true
   description: "Service account OpenSearch Dashboards authenticates with"
 YAML
-chmod 0600 "$CONF/opensearch-security/internal_users.yml"
 
 # ---------------------------------------------------------------------------
 # 5. Node configuration
@@ -234,10 +232,15 @@ fi
 
 if [ "$IS_ROOT" = "yes" ]; then
   chown -R 1000:0 "$CONF"
-  chmod 0640 "$CONF/opensearch.yml" "$CONF/opensearch-security/internal_users.yml"
-  if [ -f "$CONF/opensearch.keystore" ]; then
-    chmod 0660 "$CONF/opensearch.keystore"
-  fi
+fi
+
+# The security plugin audits these at startup and warns on anything looser.
+# Everything under config/ is owned by the uid the node runs as, so owner-only
+# is exactly right.
+chmod 0700 "$CONF" "$CONF/certs" "$CONF/opensearch-security"
+chmod 0600 "$CONF"/certs/*.pem "$CONF"/opensearch-security/*.yml "$CONF/opensearch.yml"
+if [ -f "$CONF/opensearch.keystore" ]; then
+  chmod 0600 "$CONF/opensearch.keystore"
 fi
 
 # ---------------------------------------------------------------------------
