@@ -74,11 +74,6 @@ opensearch_security.cookie.password: "$COOKIE_PASSWORD"
 # Railway's health check is anonymous; /api/status is the only route it reaches
 # and it reports red whenever the OpenSearch node is unreachable.
 opensearch_security.auth.unauthenticated_routes: ["/api/status"]
-
-# A self-hosted deployment phones nobody home.
-telemetry.enabled: false
-telemetry.optIn: false
-newsfeed.enabled: false
 YAML
 
 if [ -n "${DASHBOARDS_EXTRA_CONFIG:-}" ]; then
